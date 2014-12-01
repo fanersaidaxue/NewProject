@@ -6,9 +6,15 @@ import java.util.ArrayList;
 
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
+import com.hp.hpl.jena.rdf.model.Property;
+import com.hp.hpl.jena.rdf.model.RDFNode;
+import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.rdf.model.StmtIterator;
 import com.hp.hpl.jena.util.FileManager;
+import com.uvsq.Interface.MainForm;
+import com.uvsq.Jung.JUNG;
+import com.uvsq.Model.TupleRDF;
 
 public class RDFManager {
 	private RDF rdf;
@@ -67,10 +73,16 @@ public class RDFManager {
 			System.out.println("y");
 			while (iter.hasNext()) {
 				Statement stmt      = iter.nextStatement(); // get next statement
-			
                 triplets.add(stmt);	
-                 
-        }
+                Resource  subject   = stmt.getSubject();     // get the subject
+                Property  predicate = stmt.getPredicate();   // get the predicate
+                RDFNode   object    = stmt.getObject();      // get the object
+				JUNG.graphGros.addVertex(subject);
+				JUNG.graphGros.addVertex(object);
+				TupleRDF t = new TupleRDF(subject, predicate, object);
+				//System.out.println(t.toString());
+				JUNG.graphGros.addEdge(t, subject, object);
+        }			
 			return 1;
 		}
 		else return 0;

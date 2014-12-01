@@ -14,10 +14,6 @@ import org.apache.lucene.queryparser.classic.ParseException;
 
 import com.hp.hpl.jena.rdf.model.Statement;
 
-
-
-
-
 import com.uvsq.Jung.JUNG;
 import com.uvsq.Lucene.Lucene;
 import com.uvsq.RDF.RDF;
@@ -45,7 +41,7 @@ public class MainForm  extends javax.swing.JFrame {
 	        chemin_txt   = new javax.swing.JTextField();
 	        launch_bt    = new javax.swing.JButton();
 	        search_txt   = new javax.swing.JTextField();
-	        refresh_bt	=new javax.swing.JButton(new ImageIcon(getClass().getResource("refresh.png")));
+	        refresh_bt	 = new javax.swing.JButton(new ImageIcon(getClass().getResource("refresh.png")));
 	        search_bt    = new javax.swing.JButton(new ImageIcon(getClass().getResource("search.png")));
 	        jScrollPane1 = new javax.swing.JScrollPane();
 	        jMenuBar1    = new javax.swing.JMenuBar();
@@ -55,8 +51,8 @@ public class MainForm  extends javax.swing.JFrame {
 	        jlabel = new  javax.swing.JLabel();
 	        
 	        model.addColumn("Ressource");
-	        model.addColumn("Prédicat");
-	        model.addColumn("Objet");
+	        model.addColumn("Predicate");
+	        model.addColumn("Object");
 	        maTable.getColumnModel().getColumn(0).setPreferredWidth(0);
 	        maTable.setBackground(new java.awt.Color(204, 204, 204));
 	        this.setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -155,7 +151,9 @@ public class MainForm  extends javax.swing.JFrame {
 	    			
 	    			for(Statement triplet : rdfManager.getTriplets())
 	    			{
-	    				model.addRow(new Object[]{triplet.getSubject().toString(), triplet.getPredicate().getLocalName().toString(),triplet.getObject().toString()});
+	    				model.addRow(new Object[]{triplet.getSubject().toString(), 
+	    						triplet.getPredicate().getLocalName().toString(),
+	    						triplet.getObject().toString()});	    					    				
 	    			}	
 	    		}
 	    		else {}//�chec
@@ -183,7 +181,10 @@ public class MainForm  extends javax.swing.JFrame {
 	    		while (model.getRowCount()!=0)
 	    			model.removeRow(0);
 	    		Object[][]result = lucene.Search(search_txt.getText());
+	    		//create a simple graph
 	    		JUNG.creatTree(result);
+	    		//create a complex graph
+	    		JUNG.createTreeCompl(result);
 	    		for(int i=0; i<result.length;i++){
 	    			model.addRow( result[i]);
 	    		}	    		

@@ -7,28 +7,38 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Paint;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Hashtable;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import javax.swing.JFrame;
 
 import net.rootdev.jenajung.JenaJungGraph;
 import net.rootdev.jenajung.Transformers;
 
+import org.apache.commons.collections15.Factory;
 import org.apache.commons.collections15.Transformer;
 
 import com.hp.hpl.jena.rdf.model.Model;
 import com.hp.hpl.jena.rdf.model.ModelFactory;
+import com.hp.hpl.jena.rdf.model.Property;
 import com.hp.hpl.jena.rdf.model.RDFNode;
 import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.ResourceFactory;
 import com.hp.hpl.jena.rdf.model.Statement;
 import com.hp.hpl.jena.util.FileManager;
 import com.hp.hpl.jena.vocabulary.VCARD;
+import com.uvsq.Interface.MainForm;
+import com.uvsq.Model.TupleRDF;
 
 import edu.uci.ics.jung.algorithms.layout.FRLayout;
 import edu.uci.ics.jung.algorithms.layout.Layout;
+import edu.uci.ics.jung.algorithms.shortestpath.DijkstraShortestPath;
+import edu.uci.ics.jung.algorithms.transformation.DirectionTransformer;
 import edu.uci.ics.jung.graph.Graph;
+import edu.uci.ics.jung.graph.SparseMultigraph;
 import edu.uci.ics.jung.visualization.RenderContext;
 import edu.uci.ics.jung.visualization.VisualizationViewer;
 import edu.uci.ics.jung.visualization.control.DefaultModalGraphMouse;
@@ -40,11 +50,66 @@ import edu.uci.ics.jung.visualization.renderers.Renderer.VertexLabel.Position;
  *
  */
 public class JUNG {
-	static String vcardUri="http://www.w3.org/2001/vcard-rdf/3.0#";
+	static String vcardUri="";	
+	public static Graph<RDFNode, TupleRDF> graphGros = new SparseMultigraph<RDFNode, TupleRDF>();
 	
+	public static void createTreeCompl(Object[][] result){
+		if(result.length == 0)
+		{
+			return;
+		}
+		List<TupleRDF> tsFinal = new ArrayList<TupleRDF>();
+		List<TupleRDF> ts = convertirTuples(result);
+		tsFinal.addAll(ts);
+		Model model = ModelFactory.createDefaultModel();
+		//get a root
+		TupleRDF root = null;
+		try {
+			root = ts.get(0).clone();
+		} catch (CloneNotSupportedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		RDFNode rootNode = model.createResource(root.getSujet().toString());
+		//build a map
+		for(TupleRDF t : ts)
+		{
+			RDFNode nodeTarget = model.createResource(t.getSujet().toString());
+			List<TupleRDF> tsChemin = findShortestPath(rootNode, nodeTarget);
+			tsFinal.addAll(tsChemin);
+		}
+		//eliminate the duplications
+		Set<TupleRDF> noDup = new LinkedHashSet<TupleRDF>(tsFinal);
+		tsFinal.clear();
+		tsFinal = new ArrayList<TupleRDF>(noDup);
+		//create a model
+		model = convertirModel(tsFinal);
+		createGraph(model, "Graphe de resultat (Avec liaison)");
+	}
+	
+	public static List<TupleRDF> findShortestPath(RDFNode n1, RDFNode n2)
+	{
+		DijkstraShortestPath<RDFNode,TupleRDF> alg = new DijkstraShortestPath(JUNG.graphGros);
+        List<TupleRDF> ts = alg.getPath(n1 , n2);
+        return ts;
+	}
+	
+	public static void creatTree(Object[][] result){
+		if(result.length == 0)
+		{
+			return;
+		}
+		List<TupleRDF> ts = convertirTuples(result);
+		Model model = convertirModel(ts);
+		createGraph(model, "Graphe de resultat (Sans liaison)");
+	}
+	
+	
+	//creer la resource recursivement.
 	public static Resource createRes(Model model, TupleRDF t)
 	{
 		Resource res = model.createResource(t.getSujet().toString());
+		//System.out.println(t.toString());
 		if(t.isHasSubNode())
 		{
 			Resource res1 = createRes(model, (TupleRDF)t.getLiteral());
@@ -56,26 +121,17 @@ public class JUNG {
 	}
 	
 	//pris en charge de transformer Object[][] en List<TupleRDF> bien organise
-	public static Model convertirModel(Object[][] result)
+	public static List<TupleRDF> convertirTuples(Object[][] result)
 	{
-		Model model = ModelFactory.createDefaultModel();
 		Hashtable htSub = new Hashtable();
-		Hashtable htObj = new Hashtable();
-		ArrayList<TupleRDF> ts = new ArrayList<TupleRDF>();
+		List<TupleRDF> ts = new ArrayList<TupleRDF>();
 		for(Object[] ligne : result){
-//			String sujet = ligne[0].toString();
-//			String predicat = ligne[1].toString();
-//			String objet = ligne[2].toString();
-			//Statement stat = ResourceFactory.createStatement(sujet, predicat, objet);
-//			Resource res = model.createResource(sujet)
-//					.addProperty(model.createProperty(vcardUri, predicat), objet);
 			TupleRDF t = new TupleRDF(ligne[0], ligne[1], ligne[2]);
 			htSub.put(t.getSujet(), t);
-			htObj.put(t.getLiteral(), t);
 			ts.add(t);
 		}
-		ArrayList<TupleRDF> tsClone = new ArrayList<TupleRDF>();
-		tsClone = (ArrayList<TupleRDF>) ts.clone();
+		List<TupleRDF> tsClone = new ArrayList<TupleRDF>();
+		tsClone.addAll(ts);
 		for(TupleRDF t : tsClone)
 		{
 			if(htSub.containsKey(t.getLiteral())){
@@ -85,7 +141,13 @@ public class JUNG {
 				t.setHasSubNode(true);
 				ts.remove(t1);
 			}
-		}
+		}		
+		return ts;
+	}
+	
+	public static Model convertirModel(List<TupleRDF> ts)
+	{
+		Model model = ModelFactory.createDefaultModel();      
 		for(TupleRDF t : ts)
 		{
 			createRes(model, t);
@@ -93,17 +155,12 @@ public class JUNG {
 		return model;
 	}
 	
-	public static void creatTree(Object[][] result){
-		if(result.length == 0)
-		{
-			return;
-		}
-		Model model = convertirModel(result);
-		
+	public static void createGraph(Model model, String title)
+	{		
 		int width = 1350;
         int height = 700;
         
-        //Model model = null;		//FileManager.get().loadModel(resource);
+        //Model model = null;		//FileManager.get().loadModel(resource);*-
         Graph<RDFNode, Statement> g = new JenaJungGraph(model);
 
         Layout<RDFNode, Statement> layout = new FRLayout(g);
@@ -131,7 +188,7 @@ public class JUNG {
         gm.setMode(Mode.PICKING);
         viz.setGraphMouse(gm);
         
-        JFrame app = new JFrame("Nad est le plus CON");
+        JFrame app = new JFrame(title);
         app.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
         app.getContentPane().add(viz);
         app.pack();

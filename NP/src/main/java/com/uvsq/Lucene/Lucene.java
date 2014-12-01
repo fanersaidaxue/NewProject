@@ -25,6 +25,8 @@ import com.hp.hpl.jena.rdf.model.Statement;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public class Lucene {
 	private static Version VERSION = Version.LUCENE_4_10_1;
@@ -49,16 +51,16 @@ public class Lucene {
     w.close();
 
   }
-
-  public Object[][]  Search(String querystr) throws ParseException, IOException
+  
+  public Object[][] SearchOnColomn(String col, String querystr) throws ParseException, IOException
   {
-	    // the "title" arg specifies the default field to use
+	// the "title" arg specifies the default field to use
 	    // when no field is explicitly specified in the query.
-	  	QueryParser qP = new QueryParser( "objet", analyzer);
-	//    qP.setDefaultOperator(QueryParser.Operator.AND);
+	  	QueryParser qP = new QueryParser( col, analyzer);
+	    qP.setDefaultOperator(QueryParser.Operator.AND);
 	    Query q=qP.parse(querystr);
 	    
-	    int hitsPerPage = 10;
+	    int hitsPerPage = 10000;
 	    IndexReader reader = DirectoryReader.open(index);
 	    IndexSearcher searcher = new IndexSearcher(reader);
 	    TopScoreDocCollector collector = TopScoreDocCollector.create(hitsPerPage, true);
@@ -68,14 +70,14 @@ public class Lucene {
 	    
 	    Object[][] tArray = new Object[hits.length][3];
 	    
-	    System.out.println("Found " + hits.length + " hits.");
+	    System.out.println(col + " : Found " + hits.length + " hits.");
 	    for(int i=0;i<hits.length;++i) {
 	      int docId = hits[i].doc;
 	      Document d = searcher.doc(docId);
 	      tArray[i][0]= d.get("ressource");
 	      tArray[i][1]= d.get("predicate");
 	      tArray[i][2]= d.get("objet");
-	      System.out.println((i + 1) + ". " + d.get("ressource") + "\t"+d.get("predicate")+"\t" + d.get("objet"));
+	      //System.out.println((i + 1) + ". " + d.get("ressource") + "\t"+d.get("predicate")+"\t" + d.get("objet"));
 	    }
 	    
 
@@ -83,6 +85,22 @@ public class Lucene {
 	    // is no need to access the documents any more.
 	    reader.close();
 	    return tArray;
+  }
+
+  public Object[][]  Search(String querystr) throws ParseException, IOException
+  {
+	    Object[][] subjets = SearchOnColomn("ressource", querystr);
+	    Object[][] objets = SearchOnColomn("objet", querystr);
+	    List<Object[]> holder = new ArrayList<Object[]>();
+	    Collections.addAll(holder, subjets);
+	    for(Object[] obj : objets)
+	    {
+	    	if(!holder.contains(obj))
+	    	{
+	    		holder.add(obj);
+	    	}
+	    }
+	    return holder.toArray(new Object[holder.size()][]);
   }
   
   private static void addDoc(IndexWriter w, String _ressource,String _predicate, String _objet) throws IOException {
