@@ -3,6 +3,8 @@
  */
 package com.uvsq.Model;
 
+import com.hp.hpl.jena.rdf.model.Resource;
+
 /**
  * @author Bruce GONG
  *
@@ -72,13 +74,14 @@ public class TupleRDF {
 	 */
 	@Override
 	public String toString() {
-		return "TupleRDF [Sujet=" + Sujet + ", Predicat=" + Predicat + ", Literal=" + Literal + "]";
+		return "TupleRDF [Sujet=" + Sujet + ", Predicat=" + Predicat + ", Literal=" + Literal + ", hasSubNode="
+				+ hasSubNode + "]";
 	}
 	/* (non-Javadoc)
 	 * @see java.lang.Object#clone()
 	 */
 	@Override
-	public TupleRDF clone() throws CloneNotSupportedException {
+	public TupleRDF clone(){
 		// TODO Auto-generated method stub
 		TupleRDF t = new TupleRDF(this.Sujet,this.Predicat,this.Literal);
 		return t;
@@ -103,12 +106,49 @@ public class TupleRDF {
 			return false;
 		TupleRDF other = (TupleRDF) obj;
 		if(this.Sujet.toString().equals(other.Sujet.toString())
-				//&& this.Predicat.toString().equals(other.Predicat.toString())
+				&& this.Predicat.toString().equals(other.Predicat.toString())
 				&& this.Literal.toString().equals(other.Literal.toString())){
 			//System.out.println("Find same.");
 			return true;
 		}else{
 			return false;
 		}
-	}	
+	}
+	
+	public String getSPARQL()
+	{
+		int last = this.Sujet.toString().lastIndexOf("/");
+		String resName = this.Sujet.toString().substring(last+1);
+		String litName = "";
+		if(this.hasSubNode){
+			litName = ((TupleRDF)this.Literal).Sujet.toString();
+		}else{
+			litName = this.Literal.toString();
+		}
+		String critere = "{\n"
+				+ "?s ?p ?o .\n"
+				+ "?s ?pt \"" + litName + "\"\n"
+				/*+ "FILTER regex(?s, \"" + resName + "\", \"i\") .\n"
+				+ "FILTER regex(?pt, \"" + this.Predicat.toString() + "\", \"i\") .\n"
+				+ "FILTER regex(?ot, \"" + litName + "\", \"i\")\n"*/
+				+ "}\n";
+		return critere;
+	}
+	
+/*	select distinct ?s, ?p, ?o
+			where {
+			{
+			       ?s ?p ?o .
+			       ?s ?pt ?ot .
+			       FILTER regex(?pt, "type", "i") .
+			       FILTER regex(?ot, "LaunchPad", "i")
+			}
+			UNION
+			{
+			       ?s ?p ?o .
+			       ?s ?pt ?ot .
+			       FILTER regex(?pt, "type", "i") .
+			       FILTER regex(?ot, "d", "i")
+			}
+			}*/
 }

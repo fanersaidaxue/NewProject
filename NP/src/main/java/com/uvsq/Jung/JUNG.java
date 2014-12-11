@@ -32,6 +32,7 @@ import com.hp.hpl.jena.util.FileManager;
 import com.hp.hpl.jena.vocabulary.VCARD;
 import com.uvsq.Interface.MainForm;
 import com.uvsq.Model.TupleRDF;
+import com.uvsq.SPARQL.SPARQL;
 
 import edu.uci.ics.jung.algorithms.layout.FRLayout;
 import edu.uci.ics.jung.algorithms.layout.Layout;
@@ -53,40 +54,39 @@ public class JUNG {
 	static String vcardUri="";	
 	public static Graph<RDFNode, TupleRDF> graphGros = new SparseMultigraph<RDFNode, TupleRDF>();
 	
-	public static void createTreeCompl(Object[][] result){
+	public static void createTreeCompl(Object[][] result, String title){
 		if(result.length == 0)
 		{
 			return;
 		}
+		//get a internal connected network by organizing the existing RDFNodes. 
 		List<TupleRDF> tsFinal = new ArrayList<TupleRDF>();
-		List<TupleRDF> ts = convertirTuples(result);
+		List<TupleRDF> ts = convertirTuples(result); 
 		tsFinal.addAll(ts);
 		Model model = ModelFactory.createDefaultModel();
 		//get a root
 		TupleRDF root = null;
-		try {
-			root = ts.get(0).clone();
-		} catch (CloneNotSupportedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		RDFNode rootNode = model.createResource(root.getSujet().toString());
-		//build a map
-		for(TupleRDF t : ts)
-		{
-			RDFNode nodeTarget = model.createResource(t.getSujet().toString());
-			List<TupleRDF> tsChemin = findShortestPath(rootNode, nodeTarget);
-			tsFinal.addAll(tsChemin);
+		for(int i = 0; i < ts.size(); i++){
+			root = ts.get(i);
+			RDFNode rootNode = model.createResource(root.getSujet().toString());
+			//build a map
+			for(TupleRDF t : ts)
+			{
+				RDFNode nodeTarget = model.createResource(t.getSujet().toString());
+				List<TupleRDF> tsChemin = findShortestPath(rootNode, nodeTarget);
+				tsFinal.addAll(tsChemin);
+			}
 		}
 		//eliminate the duplications
-		Set<TupleRDF> noDup = new LinkedHashSet<TupleRDF>(tsFinal);
-		tsFinal.clear();
-		tsFinal = new ArrayList<TupleRDF>(noDup);
+		tsFinal = connectSimply(tsFinal);
+		tsFinal = SPARQL.enrichGraph(tsFinal);
+		tsFinal = eliminateDuplication(tsFinal);
 		//create a model
 		model = convertirModel(tsFinal);
-		createGraph(model, "Graphe de resultat (Avec liaison)");
+		createGraph(model, title);
 	}
 	
+	//find the shortest path on the network of RDFNode.
 	public static List<TupleRDF> findShortestPath(RDFNode n1, RDFNode n2)
 	{
 		DijkstraShortestPath<RDFNode,TupleRDF> alg = new DijkstraShortestPath(JUNG.graphGros);
@@ -94,17 +94,73 @@ public class JUNG {
         return ts;
 	}
 	
-	public static void creatTree(Object[][] result){
+	public static void createTree(Object[][] result, String title){
 		if(result.length == 0)
 		{
 			return;
 		}
 		List<TupleRDF> ts = convertirTuples(result);
+		ts = eliminateDuplication(ts);
+		ts = connectSimply(ts);
 		Model model = convertirModel(ts);
-		createGraph(model, "Graphe de resultat (Sans liaison)");
+		createGraph(model, title);
 	}
 	
+	//transformer Object[][] en List<TupleRDF>
+	public static List<TupleRDF> convertirTuples(Object[][] result)
+	{
+		List<TupleRDF> ts = new ArrayList<TupleRDF>();
+		for(Object[] ligne : result){
+			TupleRDF t = new TupleRDF(ligne[0], ligne[1], ligne[2]);
+			ts.add(t);
+		}
+		return ts;
+	}
+
+	//eliminate the duplications
+	public static List<TupleRDF> eliminateDuplication(List<TupleRDF> ts)
+	{
+		Set<TupleRDF> noDup = new LinkedHashSet<TupleRDF>(ts);
+		ts.clear();
+		ts = new ArrayList<TupleRDF>(noDup);
+		return ts;
+	}
+
+	//connect simply according to the texts.
+	public static List<TupleRDF> connectSimply(List<TupleRDF> ts)
+	{
+		Hashtable htSub = new Hashtable();
+		for(TupleRDF t : ts)
+		{
+			htSub.put(t.getSujet().toString(), t);
+		}
+		List<TupleRDF> tsClone = new ArrayList<TupleRDF>();
+		tsClone.addAll(ts);
+		for(TupleRDF t : tsClone)
+		{
+			if(htSub.containsKey(t.getLiteral().toString())){
+				System.out.println("Build a simple connection in search result.");
+				TupleRDF t1 = (TupleRDF) htSub.get(t.getLiteral().toString());
+				t.setLiteral(t1);
+				t.setHasSubNode(true);
+				//ts.remove(t1);
+				//System.out.println("TS size : " + ts.size());
+			}
+		}
+		return ts;
+	}
 	
+	//generate a model from List<TupleRDF>
+	public static Model convertirModel(List<TupleRDF> ts)
+	{
+		Model model = ModelFactory.createDefaultModel();      
+		for(TupleRDF t : ts)
+		{
+			createRes(model, t);
+		}
+		return model;
+	}
+
 	//creer la resource recursivement.
 	public static Resource createRes(Model model, TupleRDF t)
 	{
@@ -120,41 +176,7 @@ public class JUNG {
 		return res;
 	}
 	
-	//pris en charge de transformer Object[][] en List<TupleRDF> bien organise
-	public static List<TupleRDF> convertirTuples(Object[][] result)
-	{
-		Hashtable htSub = new Hashtable();
-		List<TupleRDF> ts = new ArrayList<TupleRDF>();
-		for(Object[] ligne : result){
-			TupleRDF t = new TupleRDF(ligne[0], ligne[1], ligne[2]);
-			htSub.put(t.getSujet(), t);
-			ts.add(t);
-		}
-		List<TupleRDF> tsClone = new ArrayList<TupleRDF>();
-		tsClone.addAll(ts);
-		for(TupleRDF t : tsClone)
-		{
-			if(htSub.containsKey(t.getLiteral())){
-				System.out.println("got it");
-				TupleRDF t1 = (TupleRDF) htSub.get(t.getLiteral());
-				t.setLiteral(t1);
-				t.setHasSubNode(true);
-				ts.remove(t1);
-			}
-		}		
-		return ts;
-	}
-	
-	public static Model convertirModel(List<TupleRDF> ts)
-	{
-		Model model = ModelFactory.createDefaultModel();      
-		for(TupleRDF t : ts)
-		{
-			createRes(model, t);
-		}
-		return model;
-	}
-	
+	//create a graph by giving the model and title
 	public static void createGraph(Model model, String title)
 	{		
 		int width = 1350;

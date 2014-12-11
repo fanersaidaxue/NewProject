@@ -19,6 +19,7 @@ import com.uvsq.Model.TupleRDF;
 public class RDFManager {
 	private RDF rdf;
 	private ArrayList<Statement> triplets;
+	public static Model mod ;
 	
 	public ArrayList<Statement> getTriplets() {
 		return triplets;
@@ -68,7 +69,7 @@ public class RDFManager {
 		if(input!=null)
 		{
 			model.read(input,null);
-			
+			RDFManager.mod = model;
 			StmtIterator iter = model.listStatements();
 			System.out.println("y");
 			while (iter.hasNext()) {

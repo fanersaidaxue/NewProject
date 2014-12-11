@@ -20,6 +20,7 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.Version;
 
+import com.hp.hpl.jena.rdf.model.Resource;
 import com.hp.hpl.jena.rdf.model.Statement;
 
 import java.io.File;
@@ -30,12 +31,12 @@ import java.util.List;
 
 public class Lucene {
 	private static Version VERSION = Version.LUCENE_4_10_1;
-	private StandardAnalyzer analyzer;
-	private static String indexPath = "C:/java_project/fr.uvsq.javaproject/index_files/index";
+	private PersonalizedAnalyser analyzer;
+	private static String indexPath = "C:/Users/Gong/index";
 	private Directory index ;
 	public Lucene()
 	{
-		analyzer = new StandardAnalyzer();
+		analyzer = new PersonalizedAnalyser();
 	}
 	
   public void index(ArrayList<Statement> _triplets) throws IOException, ParseException {
@@ -45,8 +46,15 @@ public class Lucene {
     config.setOpenMode(OpenMode.CREATE);
     
     IndexWriter w = new IndexWriter(index, config);
-    for(Statement tr : _triplets)
-    	addDoc(w,tr.getSubject().toString(),tr.getPredicate().getLocalName().toString(), tr.getObject().toString());
+    for(Statement tr : _triplets){
+    	if(!(tr.getObject() instanceof Resource))
+    	{	//we make index only for the objects, not for the subResources  because SPARQL search only on objects.
+    		addDoc(w,tr.getSubject().toString(),
+    				tr.getPredicate().toString(), 
+    				tr.getObject().toString());
+    	}
+    }
+    	
     
     w.close();
 
@@ -57,7 +65,8 @@ public class Lucene {
 	// the "title" arg specifies the default field to use
 	    // when no field is explicitly specified in the query.
 	  	QueryParser qP = new QueryParser( col, analyzer);
-	    qP.setDefaultOperator(QueryParser.Operator.AND);
+	    //qP.setDefaultOperator(QueryParser.Operator.AND);
+	    qP.setDefaultOperator(QueryParser.Operator.OR);
 	    Query q=qP.parse(querystr);
 	    
 	    int hitsPerPage = 10000;
@@ -70,7 +79,8 @@ public class Lucene {
 	    
 	    Object[][] tArray = new Object[hits.length][3];
 	    
-	    System.out.println(col + " : Found " + hits.length + " hits.");
+	    System.out.println("Lucene : Found " + hits.length + " hits.");	    
+	    //System.out.println(col + " : Found " + hits.length + " hits.");
 	    for(int i=0;i<hits.length;++i) {
 	      int docId = hits[i].doc;
 	      Document d = searcher.doc(docId);
@@ -89,10 +99,11 @@ public class Lucene {
 
   public Object[][]  Search(String querystr) throws ParseException, IOException
   {
-	    Object[][] subjets = SearchOnColomn("ressource", querystr);
+	  //we don't make indexes on resources because SPARQL doesn't do it.
+	    //Object[][] subjets = SearchOnColomn("ressource", querystr);
 	    Object[][] objets = SearchOnColomn("objet", querystr);
 	    List<Object[]> holder = new ArrayList<Object[]>();
-	    Collections.addAll(holder, subjets);
+	    //Collections.addAll(holder, subjets);
 	    for(Object[] obj : objets)
 	    {
 	    	if(!holder.contains(obj))
